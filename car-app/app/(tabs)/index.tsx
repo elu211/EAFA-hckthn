@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Camera, Video, Square, Settings, AlertTriangle, Shield, MapPin, Clock, Battery, Wifi, Signal } from 'lucide-react';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Dimensions } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 
 // Define types for better type safety
 interface Alert {
@@ -15,6 +16,8 @@ interface AIFeatures {
   speedLimit: boolean;
   parkingMode: boolean;
 }
+
+const { width, height } = Dimensions.get('window');
 
 const AIDashcamApp = () => {
   const [isRecording, setIsRecording] = useState(false);
@@ -98,177 +101,468 @@ const AIDashcamApp = () => {
 
   const getAlertColor = (type: Alert['type']) => {
     switch (type) {
-      case 'danger': return 'bg-red-500';
-      case 'warning': return 'bg-yellow-500';
-      case 'info': return 'bg-blue-500';
-      case 'success': return 'bg-green-500';
-      default: return 'bg-gray-500';
+      case 'danger': return '#EF4444';
+      case 'warning': return '#F59E0B';
+      case 'info': return '#3B82F6';
+      case 'success': return '#10B981';
+      default: return '#6B7280';
     }
   };
 
   return (
-    <div className="min-h-screen bg-black text-white overflow-hidden">
+    <View style={styles.container}>
       {/* Status Bar */}
-      <div className="flex justify-between items-center p-2 bg-gray-900 text-xs">
-        <div className="flex items-center gap-2">
-          <Signal className="w-4 h-4" />
-          <Wifi className="w-4 h-4" />
-          <span>GPS</span>
-        </div>
-        <div className="font-mono">{currentTime.toLocaleTimeString()}</div>
-        <div className="flex items-center gap-1">
-          <Battery className="w-4 h-4" />
-          <span>87%</span>
-        </div>
-      </div>
+      <View style={styles.statusBar}>
+        <View style={styles.statusLeft}>
+          <Ionicons name="cellular" size={16} color="white" />
+          <Ionicons name="wifi" size={16} color="white" />
+          <Text style={styles.statusText}>GPS</Text>
+        </View>
+        <Text style={styles.timeText}>{currentTime.toLocaleTimeString()}</Text>
+        <View style={styles.statusRight}>
+          <Ionicons name="battery-full" size={16} color="white" />
+          <Text style={styles.statusText}>87%</Text>
+        </View>
+      </View>
 
       {/* Main Camera Display */}
-      <div className="relative h-80 bg-gray-800 border-2 border-gray-700">
+      <View style={styles.cameraContainer}>
         {/* Front Camera */}
-        <div className="absolute inset-0 bg-gradient-to-br from-blue-900 to-gray-900 flex items-center justify-center">
-          <div className="text-center">
-            <Camera className="w-16 h-16 mx-auto mb-2 text-gray-400" />
-            <p className="text-gray-400">Front Camera</p>
-            <p className="text-xs text-gray-500">1920x1080 • 60fps</p>
-          </div>
-        </div>
+        <View style={styles.frontCamera}>
+          <View style={styles.cameraContent}>
+            <Ionicons name="camera" size={64} color="#9CA3AF" />
+            <Text style={styles.cameraText}>Front Camera</Text>
+            <Text style={styles.cameraSubtext}>1920x1080 • 60fps</Text>
+          </View>
+        </View>
 
         {/* Back Camera (Picture-in-Picture) */}
-        <div className="absolute top-4 right-4 w-24 h-16 bg-gradient-to-br from-green-900 to-gray-900 border border-gray-600 rounded flex items-center justify-center">
-          <div className="text-center">
-            <Camera className="w-6 h-6 mx-auto text-gray-400" />
-            <p className="text-xs text-gray-400">Rear</p>
-          </div>
-        </div>
+        <View style={styles.rearCamera}>
+          <View style={styles.rearCameraContent}>
+            <Ionicons name="camera-reverse" size={24} color="#9CA3AF" />
+            <Text style={styles.rearCameraText}>Rear</Text>
+          </View>
+        </View>
 
         {/* Recording Indicator */}
         {isRecording && (
-          <div className="absolute top-4 left-4 flex items-center gap-2">
-            <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse"></div>
-            <span className="text-red-500 font-mono text-sm">REC</span>
-          </div>
+          <View style={styles.recordingIndicator}>
+            <View style={styles.recordingDot} />
+            <Text style={styles.recordingText}>REC</Text>
+          </View>
         )}
 
         {/* Speed and Location Overlay */}
-        <div className="absolute bottom-4 left-4 bg-black bg-opacity-50 p-2 rounded">
-          <div className="flex items-center gap-2 text-sm">
-            <MapPin className="w-4 h-4" />
-            <span>{Math.round(speed)} mph</span>
-          </div>
-        </div>
+        <View style={styles.speedOverlay}>
+          <Ionicons name="location" size={16} color="white" />
+          <Text style={styles.speedText}>{Math.round(speed)} mph</Text>
+        </View>
 
         {/* Recording Time */}
         {isRecording && (
-          <div className="absolute bottom-4 right-4 bg-black bg-opacity-50 p-2 rounded">
-            <div className="flex items-center gap-2 text-sm font-mono">
-              <Clock className="w-4 h-4" />
-              <span>{formatTime(recordingTime)}</span>
-            </div>
-          </div>
+          <View style={styles.timeOverlay}>
+            <Ionicons name="time" size={16} color="white" />
+            <Text style={styles.timeText}>{formatTime(recordingTime)}</Text>
+          </View>
         )}
-      </div>
+      </View>
 
       {/* AI Alerts Panel */}
-      <div className="h-20 bg-gray-900 p-2 overflow-hidden">
-        <div className="flex items-center gap-2 mb-1">
-          <Shield className="w-4 h-4 text-blue-400" />
-          <span className="text-xs font-semibold text-blue-400">AI ALERTS</span>
-        </div>
-        <div className="space-y-1">
+      <View style={styles.alertsPanel}>
+        <View style={styles.alertsHeader}>
+          <Ionicons name="shield-checkmark" size={16} color="#60A5FA" />
+          <Text style={styles.alertsTitle}>AI ALERTS</Text>
+        </View>
+        <View style={styles.alertsList}>
           {alerts.slice(0, 2).map(alert => (
-            <div key={alert.id} className="flex items-center gap-2 text-xs">
-              <div className={`w-2 h-2 rounded-full ${getAlertColor(alert.type)}`}></div>
-              <span className="truncate">{alert.message}</span>
-              <span className="text-gray-500 ml-auto">
+            <View key={alert.id} style={styles.alertItem}>
+              <View style={[styles.alertDot, { backgroundColor: getAlertColor(alert.type) }]} />
+              <Text style={styles.alertMessage} numberOfLines={1}>{alert.message}</Text>
+              <Text style={styles.alertTime}>
                 {alert.timestamp.toLocaleTimeString().slice(0, 5)}
-              </span>
-            </div>
+              </Text>
+            </View>
           ))}
-        </div>
-      </div>
+        </View>
+      </View>
 
       {/* Control Panel */}
-      <div className="flex-1 bg-gray-900 p-4">
+      <ScrollView style={styles.controlPanel} contentContainerStyle={styles.controlContent}>
         {/* Recording Controls */}
-        <div className="flex justify-center items-center gap-6 mb-6">
-          <button
-            onClick={toggleRecording}
-            className={`w-20 h-20 rounded-full flex items-center justify-center transition-all duration-300 ${
-              isRecording 
-                ? 'bg-red-500 hover:bg-red-600 shadow-lg shadow-red-500/50' 
-                : 'bg-white hover:bg-gray-100 shadow-lg'
-            }`}
+        <View style={styles.recordingControls}>
+          <TouchableOpacity
+            onPress={toggleRecording}
+            style={[
+              styles.recordButton,
+              isRecording ? styles.recordButtonActive : styles.recordButtonInactive
+            ]}
           >
             {isRecording ? (
-              <Square className="w-8 h-8 text-white" />
+              <Ionicons name="square" size={32} color="white" />
             ) : (
-              <Video className="w-8 h-8 text-black" />
+              <Ionicons name="videocam" size={32} color="black" />
             )}
-          </button>
-        </div>
+          </TouchableOpacity>
+        </View>
 
         {/* Camera Selection */}
-        <div className="mb-6">
-          <p className="text-sm font-semibold mb-2">Camera Mode</p>
-          <div className="flex gap-2">
+        <View style={styles.cameraSelection}>
+          <Text style={styles.sectionTitle}>Camera Mode</Text>
+          <View style={styles.cameraButtons}>
             {['front', 'rear', 'both'].map(mode => (
-              <button
+              <TouchableOpacity
                 key={mode}
-                onClick={() => setActiveCamera(mode)}
-                className={`flex-1 py-2 px-4 rounded-lg transition-all ${
-                  activeCamera === mode
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-700 hover:bg-gray-600'
-                }`}
+                onPress={() => setActiveCamera(mode)}
+                style={[
+                  styles.cameraButton,
+                  activeCamera === mode ? styles.cameraButtonActive : styles.cameraButtonInactive
+                ]}
               >
-                {mode.charAt(0).toUpperCase() + mode.slice(1)}
-              </button>
+                <Text style={[
+                  styles.cameraButtonText,
+                  activeCamera === mode ? styles.cameraButtonTextActive : styles.cameraButtonTextInactive
+                ]}>
+                  {mode.charAt(0).toUpperCase() + mode.slice(1)}
+                </Text>
+              </TouchableOpacity>
             ))}
-          </div>
-        </div>
+          </View>
+        </View>
 
         {/* AI Features */}
-        <div className="mb-6">
-          <p className="text-sm font-semibold mb-2">AI Features</p>
-          <div className="grid grid-cols-2 gap-3">
+        <View style={styles.aiFeatures}>
+          <Text style={styles.sectionTitle}>AI Features</Text>
+          <View style={styles.featuresGrid}>
             {Object.entries(aiFeatures).map(([key, value]) => (
-              <label key={key} className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={value}
-                  onChange={(e) => setAiFeatures(prev => ({
-                    ...prev,
-                    [key]: e.target.checked
-                  }))}
-                  className="w-4 h-4 text-blue-600 bg-gray-700 border-gray-600 rounded focus:ring-blue-500"
-                />
-                <span className="text-sm">
+              <TouchableOpacity
+                key={key}
+                style={styles.featureItem}
+                onPress={() => setAiFeatures(prev => ({
+                  ...prev,
+                  [key]: !value
+                }))}
+              >
+                <View style={[styles.checkbox, value && styles.checkboxChecked]}>
+                  {value && <Ionicons name="checkmark" size={12} color="white" />}
+                </View>
+                <Text style={styles.featureText}>
                   {key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}
-                </span>
-              </label>
+                </Text>
+              </TouchableOpacity>
             ))}
-          </div>
-        </div>
+          </View>
+        </View>
 
         {/* Quick Actions */}
-        <div className="flex gap-3">
-          <button className="flex-1 bg-gray-700 hover:bg-gray-600 py-3 px-4 rounded-lg flex items-center justify-center gap-2 transition-colors">
-            <Settings className="w-5 h-5" />
-            <span className="text-sm">Settings</span>
-          </button>
-          <button className="flex-1 bg-yellow-600 hover:bg-yellow-700 py-3 px-4 rounded-lg flex items-center justify-center gap-2 transition-colors">
-            <AlertTriangle className="w-5 h-5" />
-            <span className="text-sm">Emergency</span>
-          </button>
-        </div>
-      </div>
+        <View style={styles.quickActions}>
+          <TouchableOpacity style={styles.actionButton}>
+            <Ionicons name="settings" size={20} color="white" />
+            <Text style={styles.actionText}>Settings</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.emergencyButton}>
+            <Ionicons name="warning" size={20} color="white" />
+            <Text style={styles.actionText}>Emergency</Text>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
 
       {/* Status Footer */}
-      <div className="bg-gray-800 p-2 text-xs text-center text-gray-400">
-        Storage: 128GB • Available: 89GB • Auto-backup: On
-      </div>
-    </div>
+      <View style={styles.footer}>
+        <Text style={styles.footerText}>Storage: 128GB • Available: 89GB • Auto-backup: On</Text>
+      </View>
+    </View>
   );
 };
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: 'black',
+  },
+  statusBar: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 8,
+    backgroundColor: '#111827',
+  },
+  statusLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  statusRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  statusText: {
+    color: 'white',
+    fontSize: 12,
+  },
+  timeText: {
+    color: 'white',
+    fontSize: 12,
+    fontFamily: 'monospace',
+  },
+  cameraContainer: {
+    height: 320,
+    backgroundColor: '#374151',
+    borderWidth: 2,
+    borderColor: '#4B5563',
+    position: 'relative',
+  },
+  frontCamera: {
+    flex: 1,
+    backgroundColor: '#1E3A8A',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  cameraContent: {
+    alignItems: 'center',
+  },
+  cameraText: {
+    color: '#9CA3AF',
+    marginTop: 8,
+  },
+  cameraSubtext: {
+    color: '#6B7280',
+    fontSize: 12,
+    marginTop: 4,
+  },
+  rearCamera: {
+    position: 'absolute',
+    top: 16,
+    right: 16,
+    width: 96,
+    height: 64,
+    backgroundColor: '#065F46',
+    borderWidth: 1,
+    borderColor: '#4B5563',
+    borderRadius: 4,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  rearCameraContent: {
+    alignItems: 'center',
+  },
+  rearCameraText: {
+    color: '#9CA3AF',
+    fontSize: 12,
+    marginTop: 4,
+  },
+  recordingIndicator: {
+    position: 'absolute',
+    top: 16,
+    left: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  recordingDot: {
+    width: 12,
+    height: 12,
+    backgroundColor: '#EF4444',
+    borderRadius: 6,
+  },
+  recordingText: {
+    color: '#EF4444',
+    fontFamily: 'monospace',
+    fontSize: 14,
+  },
+  speedOverlay: {
+    position: 'absolute',
+    bottom: 16,
+    left: 16,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    padding: 8,
+    borderRadius: 4,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  speedText: {
+    color: 'white',
+    fontSize: 14,
+  },
+  timeOverlay: {
+    position: 'absolute',
+    bottom: 16,
+    right: 16,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    padding: 8,
+    borderRadius: 4,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  alertsPanel: {
+    height: 80,
+    backgroundColor: '#111827',
+    padding: 8,
+  },
+  alertsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 4,
+  },
+  alertsTitle: {
+    color: '#60A5FA',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  alertsList: {
+    gap: 4,
+  },
+  alertItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  alertDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  alertMessage: {
+    color: 'white',
+    fontSize: 12,
+    flex: 1,
+  },
+  alertTime: {
+    color: '#6B7280',
+    fontSize: 12,
+  },
+  controlPanel: {
+    flex: 1,
+    backgroundColor: '#111827',
+  },
+  controlContent: {
+    padding: 16,
+  },
+  recordingControls: {
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  recordButton: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  recordButtonActive: {
+    backgroundColor: '#EF4444',
+  },
+  recordButtonInactive: {
+    backgroundColor: 'white',
+  },
+  cameraSelection: {
+    marginBottom: 24,
+  },
+  sectionTitle: {
+    color: 'white',
+    fontSize: 14,
+    fontWeight: '600',
+    marginBottom: 8,
+  },
+  cameraButtons: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  cameraButton: {
+    flex: 1,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+  },
+  cameraButtonActive: {
+    backgroundColor: '#2563EB',
+  },
+  cameraButtonInactive: {
+    backgroundColor: '#374151',
+  },
+  cameraButtonText: {
+    textAlign: 'center',
+    fontSize: 14,
+  },
+  cameraButtonTextActive: {
+    color: 'white',
+  },
+  cameraButtonTextInactive: {
+    color: 'white',
+  },
+  aiFeatures: {
+    marginBottom: 24,
+  },
+  featuresGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  featureItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    width: '48%',
+  },
+  checkbox: {
+    width: 16,
+    height: 16,
+    borderWidth: 1,
+    borderColor: '#4B5563',
+    borderRadius: 2,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  checkboxChecked: {
+    backgroundColor: '#2563EB',
+    borderColor: '#2563EB',
+  },
+  featureText: {
+    color: 'white',
+    fontSize: 14,
+  },
+  quickActions: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  actionButton: {
+    flex: 1,
+    backgroundColor: '#374151',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  emergencyButton: {
+    flex: 1,
+    backgroundColor: '#D97706',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  actionText: {
+    color: 'white',
+    fontSize: 14,
+  },
+  footer: {
+    backgroundColor: '#1F2937',
+    padding: 8,
+    alignItems: 'center',
+  },
+  footerText: {
+    color: '#9CA3AF',
+    fontSize: 12,
+  },
+});
 
 export default AIDashcamApp;
