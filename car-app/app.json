@@ -42,8 +42,9 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "9aa3a01d-8194-4a5e-b051-20eebc2bbd5c"
+        "projectId": "428c1ba5-0b4a-4ec9-8593-80f0a4118f7d"
       }
-    }
+    },
+    "owner": "aidantam1701"
   }
 }
