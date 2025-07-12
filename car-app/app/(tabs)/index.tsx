@@ -1,7 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Dimensions, Alert as RNAlert } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Dimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Camera, CameraView } from 'expo-camera';
 
 // Define types for better type safety
 interface Alert {
@@ -33,22 +32,6 @@ const AIDashcamApp = () => {
     speedLimit: true,
     parkingMode: false
   });
-  
-  // Camera state
-  const [hasPermission, setHasPermission] = useState<boolean | null>(null);
-  const [cameraType, setCameraType] = useState<'front' | 'back'>('back');
-  const cameraRef = useRef<any>(null);
-
-  // Request camera permissions
-  useEffect(() => {
-    (async () => {
-      const { status } = await Camera.requestCameraPermissionsAsync();
-      setHasPermission(status === 'granted');
-      if (status !== 'granted') {
-        RNAlert.alert('Permission needed', 'Camera permission is required to use this app.');
-      }
-    })();
-  }, []);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -93,18 +76,6 @@ const AIDashcamApp = () => {
       timestamp: new Date()
     };
     setAlerts(prev => [newAlert, ...prev.slice(0, 4)]);
-  };
-
-  const handleCameraSwitch = (mode: string) => {
-    setActiveCamera(mode);
-    if (mode === 'front') {
-      setCameraType('front');
-    } else if (mode === 'rear') {
-      setCameraType('back');
-    } else if (mode === 'both') {
-      // For 'both' mode, default to back camera as main view
-      setCameraType('back');
-    }
   };
 
   // Simulate AI alerts
@@ -156,44 +127,22 @@ const AIDashcamApp = () => {
 
       {/* Main Camera Display */}
       <View style={styles.cameraContainer}>
-        {hasPermission === null ? (
-          /* Loading state */
-          <View style={styles.frontCamera}>
-            <View style={styles.cameraContent}>
-              <Ionicons name="camera" size={64} color="#9CA3AF" />
-              <Text style={styles.cameraText}>Requesting Camera Access...</Text>
-              <Text style={styles.cameraSubtext}>Please wait</Text>
-            </View>
+        {/* Front Camera */}
+        <View style={styles.frontCamera}>
+          <View style={styles.cameraContent}>
+            <Ionicons name="camera" size={64} color="#9CA3AF" />
+            <Text style={styles.cameraText}>Front Camera</Text>
+            <Text style={styles.cameraSubtext}>1920x1080 • 60fps</Text>
           </View>
-        ) : hasPermission ? (
-          <>
-            {/* Main Camera Feed */}
-            <CameraView
-              ref={cameraRef}
-              style={styles.camera}
-              facing={cameraType}
-            >
-              {/* Picture-in-Picture Camera (when both cameras are active) */}
-              {activeCamera === 'both' && (
-                <View style={styles.rearCamera}>
-                  <View style={styles.rearCameraContent}>
-                    <Ionicons name="camera-reverse" size={24} color="#9CA3AF" />
-                    <Text style={styles.rearCameraText}>Rear</Text>
-                  </View>
-                </View>
-              )}
-            </CameraView>
-          </>
-        ) : (
-          /* Fallback when no camera permission */
-          <View style={styles.frontCamera}>
-            <View style={styles.cameraContent}>
-              <Ionicons name="camera" size={64} color="#9CA3AF" />
-              <Text style={styles.cameraText}>Camera Access Required</Text>
-              <Text style={styles.cameraSubtext}>Please grant camera permissions</Text>
-            </View>
+        </View>
+
+        {/* Back Camera (Picture-in-Picture) */}
+        <View style={styles.rearCamera}>
+          <View style={styles.rearCameraContent}>
+            <Ionicons name="camera-reverse" size={24} color="#9CA3AF" />
+            <Text style={styles.rearCameraText}>Rear</Text>
           </View>
-        )}
+        </View>
 
         {/* Recording Indicator */}
         {isRecording && (
@@ -263,7 +212,7 @@ const AIDashcamApp = () => {
             {['front', 'rear', 'both'].map(mode => (
               <TouchableOpacity
                 key={mode}
-                onPress={() => handleCameraSwitch(mode)}
+                onPress={() => setActiveCamera(mode)}
                 style={[
                   styles.cameraButton,
                   activeCamera === mode ? styles.cameraButtonActive : styles.cameraButtonInactive
@@ -362,9 +311,6 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: '#4B5563',
     position: 'relative',
-  },
-  camera: {
-    flex: 1,
   },
   frontCamera: {
     flex: 1,
