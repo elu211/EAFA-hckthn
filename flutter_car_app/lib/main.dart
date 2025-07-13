@@ -35,8 +35,10 @@ class AIFeatures {
 }
 
 class AIDashcamApp extends StatefulWidget {
+  const AIDashcamApp({super.key});
+
   @override
-  _AIDashcamAppState createState() => _AIDashcamAppState();
+  State<AIDashcamApp> createState() => _AIDashcamAppState();
 }
 
 class _AIDashcamAppState extends State<AIDashcamApp> {
@@ -86,7 +88,7 @@ class _AIDashcamAppState extends State<AIDashcamApp> {
         await _initializeCameraController();
       }
     } catch (e) {
-      print('Error initializing cameras: $e');
+      debugPrint('Error initializing cameras: $e');
       addAlert(AlertType.danger, 'Camera initialization failed');
     }
   }
@@ -118,13 +120,8 @@ class _AIDashcamAppState extends State<AIDashcamApp> {
         );
       }
     } catch (e) {
-      print('Error selecting camera: $e');
+      debugPrint('Error selecting camera: $e');
       selectedCamera = _cameras.first;
-    }
-    
-    if (selectedCamera == null) {
-      addAlert(AlertType.danger, 'No camera available');
-      return;
     }
     
     _cameraController = CameraController(
@@ -141,7 +138,7 @@ class _AIDashcamAppState extends State<AIDashcamApp> {
         });
       }
     } catch (e) {
-      print('Error initializing camera controller: $e');
+      debugPrint('Error initializing camera controller: $e');
       addAlert(AlertType.danger, 'Failed to initialize camera');
       if (_cameraController != null) {
         await _cameraController!.dispose();
@@ -198,7 +195,7 @@ class _AIDashcamAppState extends State<AIDashcamApp> {
       isRecordingVideo = true;
     });
     addAlert(AlertType.success, 'Recording started (simulated)');
-    print('Recording started - camera integration pending');
+    debugPrint('Recording started - camera integration pending');
   }
 
   void stopRecording() {
@@ -206,7 +203,7 @@ class _AIDashcamAppState extends State<AIDashcamApp> {
       isRecordingVideo = false;
     });
     addAlert(AlertType.info, 'Recording stopped and saved');
-    print('Recording stopped - camera integration pending');
+    debugPrint('Recording stopped - camera integration pending');
   }
 
   void toggleRecording() {
@@ -250,7 +247,7 @@ class _AIDashcamAppState extends State<AIDashcamApp> {
       timestamp: DateTime.now(),
     );
     setState(() {
-      alerts = [newAlert, ...alerts.take(4).toList()];
+      alerts = [newAlert, ...alerts.take(4)];
     });
   }
 
@@ -264,8 +261,6 @@ class _AIDashcamAppState extends State<AIDashcamApp> {
         return Color(0xFF3B82F6);
       case AlertType.success:
         return Color(0xFF10B981);
-      default:
-        return Color(0xFF6B7280);
     }
   }
 
@@ -276,37 +271,6 @@ class _AIDashcamAppState extends State<AIDashcamApp> {
       body: SafeArea(
         child: Column(
           children: [
-            // Status Bar
-            Container(
-              padding: EdgeInsets.all(8),
-              color: Color(0xFF111827),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Row(
-                    children: [
-                      Icon(Icons.signal_cellular_4_bar, size: 16, color: Colors.white),
-                      SizedBox(width: 8),
-                      Icon(Icons.wifi, size: 16, color: Colors.white),
-                      SizedBox(width: 8),
-                      Text('GPS', style: TextStyle(color: Colors.white, fontSize: 12)),
-                    ],
-                  ),
-                  Text(
-                    '${currentTime.hour.toString().padLeft(2, '0')}:${currentTime.minute.toString().padLeft(2, '0')}:${currentTime.second.toString().padLeft(2, '0')}',
-                    style: TextStyle(color: Colors.white, fontSize: 12, fontFamily: 'monospace'),
-                  ),
-                  Row(
-                    children: [
-                      Icon(Icons.battery_full, size: 16, color: Colors.white),
-                      SizedBox(width: 4),
-                      Text('87%', style: TextStyle(color: Colors.white, fontSize: 12)),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-
             // Main Camera Display
             Expanded(
               flex: 2,
@@ -360,7 +324,7 @@ class _AIDashcamAppState extends State<AIDashcamApp> {
                       child: isRecording ? Container(
                         padding: EdgeInsets.all(8),
                         decoration: BoxDecoration(
-                          color: Colors.black.withOpacity(0.5),
+                          color: Colors.black.withValues(alpha: 0.5),
                           borderRadius: BorderRadius.circular(4),
                         ),
                         child: Row(
@@ -390,7 +354,7 @@ class _AIDashcamAppState extends State<AIDashcamApp> {
                       child: Container(
                         padding: EdgeInsets.all(8),
                         decoration: BoxDecoration(
-                          color: Colors.black.withOpacity(0.5),
+                          color: Colors.black.withValues(alpha: 0.5),
                           borderRadius: BorderRadius.circular(4),
                         ),
                         child: Row(
@@ -531,7 +495,10 @@ class _AIDashcamAppState extends State<AIDashcamApp> {
                                               ),
                                             ),
                                           if (activeCamera == mode && !_isCameraInitialized)
-                                            SizedBox(width: 8),
+                                            Padding(
+                                              padding: EdgeInsets.only(left: 8),
+                                              child: SizedBox.shrink(),
+                                            ),
                                           Text(
                                             mode[0].toUpperCase() + mode.substring(1),
                                             textAlign: TextAlign.center,
