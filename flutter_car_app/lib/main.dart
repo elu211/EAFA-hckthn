@@ -55,11 +55,14 @@ class _AIDashcamAppState extends State<AIDashcamApp> {
   Timer? _timer;
   Timer? _speedTimer;
   Timer? _alertTimer;
+  Timer? _captureTimer; // Timer for automatic picture capture
   final Random _random = Random();
 
   List<CameraDescription> _cameras = [];
   CameraController? _cameraController;
   bool _isCameraInitialized = false;
+  bool _isCapturing = false; // Add flag for capture indicator
+  List<Map<String, dynamic>> _capturedImages = []; // Store captured images
 
   @override
   void initState() {
@@ -73,6 +76,7 @@ class _AIDashcamAppState extends State<AIDashcamApp> {
     _timer?.cancel();
     _speedTimer?.cancel();
     _alertTimer?.cancel();
+    _captureTimer?.cancel(); // Cancel capture timer
     _cameraController?.dispose();
     super.dispose();
   }
@@ -180,6 +184,12 @@ class _AIDashcamAppState extends State<AIDashcamApp> {
       setState(() {
         speed = max(0, speed + (_random.nextDouble() - 0.5) * 10);
       });
+    });
+
+    _captureTimer = Timer.periodic(Duration(seconds: 1), (timer) {
+      if (mounted) {
+        _capturePicture();
+      }
     });
   }
 
@@ -367,6 +377,35 @@ class _AIDashcamAppState extends State<AIDashcamApp> {
                         ),
                       ),
                     ),
+
+                    // Capture Indicator
+                    if (_isCapturing)
+                      Positioned(
+                        top: 16,
+                        right: 16,
+                        child: Container(
+                          padding: EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: Colors.red.withValues(alpha: 0.8),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Container(
+                                width: 8,
+                                height: 8,
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                              ),
+                              SizedBox(width: 6),
+                              Text('CAPTURING', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
+                            ],
+                          ),
+                        ),
+                      ),
                   ],
                 ),
               ),
@@ -658,6 +697,40 @@ class _AIDashcamAppState extends State<AIDashcamApp> {
         ),
       ),
     );
+  }
+
+  void _capturePicture() async {
+    if (_cameraController == null || !_cameraController!.value.isInitialized) {
+      return;
+    }
+
+    try {
+      setState(() {
+        _isCapturing = true; // Set flag to show capturing indicator
+      });
+      
+      final XFile image = await _cameraController!.takePicture();
+      final timestamp = DateTime.now();
+      
+      setState(() {
+        _capturedImages.add({'file': image, 'timestamp': timestamp});
+        _isCapturing = false; // Clear flag after capture
+      });
+      
+      // Keep only the last 100 images to prevent memory issues
+      if (_capturedImages.length > 100) {
+        setState(() {
+          _capturedImages.removeAt(0);
+        });
+      }
+      
+      debugPrint('Picture captured: ${image.path} at $timestamp');
+    } catch (e) {
+      debugPrint('Error capturing picture: $e');
+      setState(() {
+        _isCapturing = false; // Clear flag on error
+      });
+    }
   }
 }
 
