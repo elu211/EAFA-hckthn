@@ -39,7 +39,9 @@
     "react-native-web": "~0.20.0",
     "react-native-webview": "13.13.5",
     "expo-dev-client": "~5.2.4",
-    "react-native-svg": "15.11.2"
+    "react-native-svg": "15.11.2",
+    "expo-camera": "~16.1.10",
+    "expo-media-library": "~17.1.7"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",

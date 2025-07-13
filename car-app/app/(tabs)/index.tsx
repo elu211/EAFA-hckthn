@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Dimensions } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Dimensions, Alert as RNAlert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 // Define types for better type safety
@@ -32,6 +32,12 @@ const AIDashcamApp = () => {
     speedLimit: true,
     parkingMode: false
   });
+  
+  // Camera states (placeholder for now)
+  const [hasCameraPermission, setHasCameraPermission] = useState<boolean | null>(true);
+  const [cameraType, setCameraType] = useState<'front' | 'back'>('back');
+  const [flashMode, setFlashMode] = useState<'off' | 'on'>('off');
+  const cameraRef = React.useRef<any>(null);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -59,13 +65,30 @@ const AIDashcamApp = () => {
     return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const toggleRecording = () => {
+  const startRecording = async () => {
+    // Placeholder for camera recording
+    console.log('Recording started (placeholder)');
+    setIsRecording(true);
+  };
+
+  const stopRecording = async () => {
+    // Placeholder for stopping recording
+    console.log('Recording stopped (placeholder)');
+  };
+
+  const toggleRecording = async () => {
     if (isRecording) {
+      await stopRecording();
       setIsRecording(false);
       setRecordingTime(0);
     } else {
+      await startRecording();
       setIsRecording(true);
     }
+  };
+
+  const toggleFlash = () => {
+    setFlashMode(flashMode === 'off' ? 'on' : 'off');
   };
 
   const addAlert = (type: Alert['type'], message: string) => {
@@ -109,6 +132,8 @@ const AIDashcamApp = () => {
     }
   };
 
+
+
   return (
     <View style={styles.container}>
       {/* Status Bar */}
@@ -127,44 +152,46 @@ const AIDashcamApp = () => {
 
       {/* Main Camera Display */}
       <View style={styles.cameraContainer}>
-        {/* Front Camera */}
-        <View style={styles.frontCamera}>
-          <View style={styles.cameraContent}>
+        <View style={styles.camera}>
+          {/* Camera Placeholder */}
+          <View style={styles.cameraPlaceholder}>
             <Ionicons name="camera" size={64} color="#9CA3AF" />
-            <Text style={styles.cameraText}>Front Camera</Text>
-            <Text style={styles.cameraSubtext}>1920x1080 • 60fps</Text>
+            <Text style={styles.cameraText}>Camera Ready</Text>
+            <Text style={styles.cameraSubtext}>Tap to start recording</Text>
+          </View>
+          
+          {/* Camera Overlays */}
+          <View style={styles.cameraOverlay}>
+            {/* Recording Indicator */}
+            {isRecording && (
+              <View style={styles.recordingIndicator}>
+                <View style={styles.recordingDot} />
+                <Text style={styles.recordingText}>REC</Text>
+                <Text style={styles.recordingTime}>{formatTime(recordingTime)}</Text>
+              </View>
+            )}
+
+            {/* Camera Controls */}
+            <View style={styles.cameraControls}>
+              <TouchableOpacity
+                style={styles.controlButton}
+                onPress={toggleFlash}
+              >
+                <Ionicons 
+                  name={flashMode === 'off' ? "flash-off" : "flash"} 
+                  size={24} 
+                  color="white" 
+                />
+              </TouchableOpacity>
+            </View>
+
+            {/* Speed and Location Overlay */}
+            <View style={styles.speedOverlay}>
+              <Ionicons name="location" size={16} color="white" />
+              <Text style={styles.speedText}>{Math.round(speed)} mph</Text>
+            </View>
           </View>
         </View>
-
-        {/* Back Camera (Picture-in-Picture) */}
-        <View style={styles.rearCamera}>
-          <View style={styles.rearCameraContent}>
-            <Ionicons name="camera-reverse" size={24} color="#9CA3AF" />
-            <Text style={styles.rearCameraText}>Rear</Text>
-          </View>
-        </View>
-
-        {/* Recording Indicator */}
-        {isRecording && (
-          <View style={styles.recordingIndicator}>
-            <View style={styles.recordingDot} />
-            <Text style={styles.recordingText}>REC</Text>
-          </View>
-        )}
-
-        {/* Speed and Location Overlay */}
-        <View style={styles.speedOverlay}>
-          <Ionicons name="location" size={16} color="white" />
-          <Text style={styles.speedText}>{Math.round(speed)} mph</Text>
-        </View>
-
-        {/* Recording Time */}
-        {isRecording && (
-          <View style={styles.timeOverlay}>
-            <Ionicons name="time" size={16} color="white" />
-            <Text style={styles.timeText}>{formatTime(recordingTime)}</Text>
-          </View>
-        )}
       </View>
 
       {/* AI Alerts Panel */}
@@ -212,7 +239,12 @@ const AIDashcamApp = () => {
             {['front', 'rear', 'both'].map(mode => (
               <TouchableOpacity
                 key={mode}
-                onPress={() => setActiveCamera(mode)}
+                onPress={() => {
+                  setActiveCamera(mode);
+                  if (mode === 'front') setCameraType('front');
+                  else if (mode === 'rear') setCameraType('back');
+                  else setCameraType('back'); // Default for 'both'
+                }}
                 style={[
                   styles.cameraButton,
                   activeCamera === mode ? styles.cameraButtonActive : styles.cameraButtonInactive
@@ -279,6 +311,33 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: 'black',
   },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    color: 'white',
+    fontSize: 18,
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  errorText: {
+    color: 'white',
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginTop: 10,
+  },
+  errorSubtext: {
+    color: '#9CA3AF',
+    fontSize: 14,
+    marginTop: 5,
+    textAlign: 'center',
+  },
   statusBar: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -306,58 +365,47 @@ const styles = StyleSheet.create({
     fontFamily: 'monospace',
   },
   cameraContainer: {
-    height: 320,
+    flex: 1,
     backgroundColor: '#374151',
     borderWidth: 2,
     borderColor: '#4B5563',
     position: 'relative',
   },
-  frontCamera: {
+  camera: {
     flex: 1,
     backgroundColor: '#1E3A8A',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  cameraContent: {
+  cameraPlaceholder: {
     alignItems: 'center',
   },
   cameraText: {
     color: '#9CA3AF',
     marginTop: 8,
+    fontSize: 16,
   },
   cameraSubtext: {
     color: '#6B7280',
     fontSize: 12,
     marginTop: 4,
   },
-  rearCamera: {
+  cameraOverlay: {
     position: 'absolute',
-    top: 16,
-    right: 16,
-    width: 96,
-    height: 64,
-    backgroundColor: '#065F46',
-    borderWidth: 1,
-    borderColor: '#4B5563',
-    borderRadius: 4,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  rearCameraContent: {
-    alignItems: 'center',
-  },
-  rearCameraText: {
-    color: '#9CA3AF',
-    fontSize: 12,
-    marginTop: 4,
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'space-between',
+    padding: 16,
   },
   recordingIndicator: {
-    position: 'absolute',
-    top: 16,
-    left: 16,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    padding: 8,
+    borderRadius: 4,
   },
   recordingDot: {
     width: 12,
@@ -369,6 +417,20 @@ const styles = StyleSheet.create({
     color: '#EF4444',
     fontFamily: 'monospace',
     fontSize: 14,
+  },
+  recordingTime: {
+    color: 'white',
+    fontFamily: 'monospace',
+    fontSize: 14,
+  },
+  cameraControls: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    padding: 10,
+    backgroundColor: 'transparent',
+  },
+  controlButton: {
+    padding: 10,
   },
   speedOverlay: {
     position: 'absolute',
@@ -384,17 +446,6 @@ const styles = StyleSheet.create({
   speedText: {
     color: 'white',
     fontSize: 14,
-  },
-  timeOverlay: {
-    position: 'absolute',
-    bottom: 16,
-    right: 16,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    padding: 8,
-    borderRadius: 4,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
   },
   alertsPanel: {
     height: 80,

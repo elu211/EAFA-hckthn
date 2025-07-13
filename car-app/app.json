@@ -34,6 +34,20 @@
           "resizeMode": "contain",
           "backgroundColor": "#ffffff"
         }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow $(PRODUCT_NAME) to access your camera to record video and take photos for the dashcam functionality.",
+          "microphonePermission": "Allow $(PRODUCT_NAME) to access your microphone to record audio with video."
+        }
+      ],
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "Allow $(PRODUCT_NAME) to access your photos to save recorded videos.",
+          "savePhotosPermission": "Allow $(PRODUCT_NAME) to save recorded videos to your photo library."
+        }
       ]
     ],
     "experiments": {
