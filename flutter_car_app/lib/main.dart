@@ -62,7 +62,7 @@ class _AIDashcamAppState extends State<AIDashcamApp> {
   CameraController? _cameraController;
   bool _isCameraInitialized = false;
   bool _isCapturing = false; // Add flag for capture indicator
-  List<Map<String, dynamic>> _capturedImages = []; // Store captured images
+  final List<Map<String, dynamic>> _capturedImages = []; // Store captured images
 
   @override
   void initState() {
@@ -85,15 +85,21 @@ class _AIDashcamAppState extends State<AIDashcamApp> {
     try {
       WidgetsFlutterBinding.ensureInitialized();
       final cameras = await availableCameras();
-      setState(() {
-        _cameras = cameras;
-      });
-      if (_cameras.isNotEmpty) {
-        await _initializeCameraController();
+      if (mounted) {
+        setState(() {
+          _cameras = cameras;
+        });
+        if (_cameras.isNotEmpty) {
+          await _initializeCameraController();
+        } else {
+          addAlert(AlertType.warning, 'No cameras found');
+        }
       }
     } catch (e) {
       debugPrint('Error initializing cameras: $e');
-      addAlert(AlertType.danger, 'Camera initialization failed');
+      if (mounted) {
+        addAlert(AlertType.danger, 'Camera initialization failed');
+      }
     }
   }
 
@@ -106,9 +112,11 @@ class _AIDashcamAppState extends State<AIDashcamApp> {
       _cameraController = null;
     }
     
-    setState(() {
-      _isCameraInitialized = false;
-    });
+    if (mounted) {
+      setState(() {
+        _isCameraInitialized = false;
+      });
+    }
     
     CameraDescription? selectedCamera;
     try {
@@ -143,7 +151,9 @@ class _AIDashcamAppState extends State<AIDashcamApp> {
       }
     } catch (e) {
       debugPrint('Error initializing camera controller: $e');
-      addAlert(AlertType.danger, 'Failed to initialize camera');
+      if (mounted) {
+        addAlert(AlertType.danger, 'Failed to initialize camera');
+      }
       if (_cameraController != null) {
         await _cameraController!.dispose();
         _cameraController = null;
@@ -154,19 +164,23 @@ class _AIDashcamAppState extends State<AIDashcamApp> {
   Future<void> _switchCamera(String mode) async {
     if (activeCamera == mode) return; // Don't switch if already on that camera
     
-    setState(() {
-      activeCamera = mode;
-      cameraType = mode == 'front' ? 'front' : 'back';
-    });
+    if (mounted) {
+      setState(() {
+        activeCamera = mode;
+        cameraType = mode == 'front' ? 'front' : 'back';
+      });
+    }
     
     addAlert(AlertType.info, 'Switching to $mode camera...');
     
     await _initializeCameraController();
     
-    if (_isCameraInitialized) {
-      addAlert(AlertType.success, 'Switched to $mode camera');
-    } else {
-      addAlert(AlertType.danger, 'Failed to switch to $mode camera');
+    if (mounted) {
+      if (_isCameraInitialized) {
+        addAlert(AlertType.success, 'Switched to $mode camera');
+      } else {
+        addAlert(AlertType.danger, 'Failed to switch to $mode camera');
+      }
     }
   }
 
@@ -186,8 +200,8 @@ class _AIDashcamAppState extends State<AIDashcamApp> {
       });
     });
 
-    _captureTimer = Timer.periodic(Duration(seconds: 1), (timer) {
-      if (mounted) {
+    _captureTimer = Timer.periodic(Duration(seconds: 5), (timer) {
+      if (mounted && isRecording) {
         _capturePicture();
       }
     });
@@ -533,11 +547,11 @@ class _AIDashcamAppState extends State<AIDashcamApp> {
                                                 valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                                               ),
                                             ),
-                                          if (activeCamera == mode && !_isCameraInitialized)
-                                            Padding(
-                                              padding: EdgeInsets.only(left: 8),
-                                              child: SizedBox.shrink(),
-                                            ),
+                                                                                     if (activeCamera == mode && !_isCameraInitialized)
+                                             Padding(
+                                               padding: EdgeInsets.only(left: 8),
+                                               child: SizedBox(),
+                                             ),
                                           Text(
                                             mode[0].toUpperCase() + mode.substring(1),
                                             textAlign: TextAlign.center,
@@ -705,31 +719,37 @@ class _AIDashcamAppState extends State<AIDashcamApp> {
     }
 
     try {
-      setState(() {
-        _isCapturing = true; // Set flag to show capturing indicator
-      });
+      if (mounted) {
+        setState(() {
+          _isCapturing = true; // Set flag to show capturing indicator
+        });
+      }
       
       final XFile image = await _cameraController!.takePicture();
       final timestamp = DateTime.now();
       
-      setState(() {
-        _capturedImages.add({'file': image, 'timestamp': timestamp});
-        _isCapturing = false; // Clear flag after capture
-      });
-      
-      // Keep only the last 100 images to prevent memory issues
-      if (_capturedImages.length > 100) {
+      if (mounted) {
         setState(() {
-          _capturedImages.removeAt(0);
+          _capturedImages.add({'file': image, 'timestamp': timestamp});
+          _isCapturing = false; // Clear flag after capture
         });
+        
+        // Keep only the last 100 images to prevent memory issues
+        if (_capturedImages.length > 100) {
+          setState(() {
+            _capturedImages.removeAt(0);
+          });
+        }
       }
       
       debugPrint('Picture captured: ${image.path} at $timestamp');
     } catch (e) {
       debugPrint('Error capturing picture: $e');
-      setState(() {
-        _isCapturing = false; // Clear flag on error
-      });
+      if (mounted) {
+        setState(() {
+          _isCapturing = false; // Clear flag on error
+        });
+      }
     }
   }
 }
