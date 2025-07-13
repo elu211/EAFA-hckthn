@@ -1,6 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Dimensions, Alert as RNAlert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { Camera, CameraView } from 'expo-camera';
+import * as MediaLibrary from 'expo-media-library';
 
 // Define types for better type safety
 interface Alert {
@@ -21,7 +23,7 @@ const { width, height } = Dimensions.get('window');
 
 const AIDashcamApp = () => {
   const [isRecording, setIsRecording] = useState(false);
-  const [activeCamera, setActiveCamera] = useState('both');
+  const [activeCamera, setActiveCamera] = useState('rear');
   const [recordingTime, setRecordingTime] = useState(0);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [speed, setSpeed] = useState(0);
@@ -33,11 +35,23 @@ const AIDashcamApp = () => {
     parkingMode: false
   });
   
-  // Camera states (placeholder for now)
-  const [hasCameraPermission, setHasCameraPermission] = useState<boolean | null>(true);
+  // Camera states
+  const [hasCameraPermission, setHasCameraPermission] = useState<boolean | null>(null);
+  const [hasMediaLibraryPermission, setHasMediaLibraryPermission] = useState<boolean | null>(null);
   const [cameraType, setCameraType] = useState<'front' | 'back'>('back');
-  const [flashMode, setFlashMode] = useState<'off' | 'on'>('off');
-  const cameraRef = React.useRef<any>(null);
+  const [isRecordingVideo, setIsRecordingVideo] = useState(false);
+  const cameraRef = useRef<any>(null);
+
+  // Request permissions
+  useEffect(() => {
+    (async () => {
+      const cameraPermission = await Camera.requestCameraPermissionsAsync();
+      const mediaLibraryPermission = await MediaLibrary.requestPermissionsAsync();
+      
+      setHasCameraPermission(cameraPermission.status === 'granted');
+      setHasMediaLibraryPermission(mediaLibraryPermission.status === 'granted');
+    })();
+  }, []);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -66,14 +80,39 @@ const AIDashcamApp = () => {
   };
 
   const startRecording = async () => {
-    // Placeholder for camera recording
-    console.log('Recording started (placeholder)');
-    setIsRecording(true);
+    if (cameraRef.current && hasCameraPermission && hasMediaLibraryPermission) {
+      try {
+        setIsRecordingVideo(true);
+        const video = await cameraRef.current.recordAsync({
+          quality: '1080p',
+          maxDuration: 3600, // 1 hour max
+          mute: false,
+        });
+        
+        // Save to media library
+        await MediaLibrary.saveToLibraryAsync(video.uri);
+        setIsRecordingVideo(false);
+        
+        addAlert('success', 'Recording saved to gallery');
+      } catch (error) {
+        console.error('Recording failed:', error);
+        setIsRecordingVideo(false);
+        addAlert('danger', 'Recording failed');
+      }
+    }
   };
 
   const stopRecording = async () => {
-    // Placeholder for stopping recording
-    console.log('Recording stopped (placeholder)');
+    if (cameraRef.current && isRecordingVideo) {
+      try {
+        await cameraRef.current.stopRecording();
+        setIsRecordingVideo(false);
+        addAlert('info', 'Recording stopped');
+      } catch (error) {
+        console.error('Stop recording failed:', error);
+        addAlert('danger', 'Failed to stop recording');
+      }
+    }
   };
 
   const toggleRecording = async () => {
@@ -85,10 +124,6 @@ const AIDashcamApp = () => {
       await startRecording();
       setIsRecording(true);
     }
-  };
-
-  const toggleFlash = () => {
-    setFlashMode(flashMode === 'off' ? 'on' : 'off');
   };
 
   const addAlert = (type: Alert['type'], message: string) => {
@@ -132,7 +167,24 @@ const AIDashcamApp = () => {
     }
   };
 
+  // Handle camera permissions
+  if (hasCameraPermission === null) {
+    return (
+      <View style={styles.loadingContainer}>
+        <Text style={styles.loadingText}>Requesting camera permissions...</Text>
+      </View>
+    );
+  }
 
+  if (hasCameraPermission === false) {
+    return (
+      <View style={styles.errorContainer}>
+        <Ionicons name="camera" size={64} color="#EF4444" />
+        <Text style={styles.errorText}>Camera permission denied</Text>
+        <Text style={styles.errorSubtext}>Please enable camera permissions in settings to use this app</Text>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -152,14 +204,11 @@ const AIDashcamApp = () => {
 
       {/* Main Camera Display */}
       <View style={styles.cameraContainer}>
-        <View style={styles.camera}>
-          {/* Camera Placeholder */}
-          <View style={styles.cameraPlaceholder}>
-            <Ionicons name="camera" size={64} color="#9CA3AF" />
-            <Text style={styles.cameraText}>Camera Ready</Text>
-            <Text style={styles.cameraSubtext}>Tap to start recording</Text>
-          </View>
-          
+        <CameraView
+          ref={cameraRef}
+          style={styles.camera}
+          facing={cameraType}
+        >
           {/* Camera Overlays */}
           <View style={styles.cameraOverlay}>
             {/* Recording Indicator */}
@@ -171,27 +220,13 @@ const AIDashcamApp = () => {
               </View>
             )}
 
-            {/* Camera Controls */}
-            <View style={styles.cameraControls}>
-              <TouchableOpacity
-                style={styles.controlButton}
-                onPress={toggleFlash}
-              >
-                <Ionicons 
-                  name={flashMode === 'off' ? "flash-off" : "flash"} 
-                  size={24} 
-                  color="white" 
-                />
-              </TouchableOpacity>
-            </View>
-
             {/* Speed and Location Overlay */}
             <View style={styles.speedOverlay}>
               <Ionicons name="location" size={16} color="white" />
               <Text style={styles.speedText}>{Math.round(speed)} mph</Text>
             </View>
           </View>
-        </View>
+        </CameraView>
       </View>
 
       {/* AI Alerts Panel */}
@@ -241,9 +276,13 @@ const AIDashcamApp = () => {
                 key={mode}
                 onPress={() => {
                   setActiveCamera(mode);
-                  if (mode === 'front') setCameraType('front');
-                  else if (mode === 'rear') setCameraType('back');
-                  else setCameraType('back'); // Default for 'both'
+                  if (mode === 'front') {
+                    setCameraType('front');
+                  } else if (mode === 'rear') {
+                    setCameraType('back');
+                  } else {
+                    setCameraType('back'); // Default for 'both'
+                  }
                 }}
                 style={[
                   styles.cameraButton,
@@ -315,6 +354,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: 'black',
   },
   loadingText: {
     color: 'white',
@@ -325,6 +365,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
+    backgroundColor: 'black',
   },
   errorText: {
     color: 'white',
@@ -373,22 +414,6 @@ const styles = StyleSheet.create({
   },
   camera: {
     flex: 1,
-    backgroundColor: '#1E3A8A',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  cameraPlaceholder: {
-    alignItems: 'center',
-  },
-  cameraText: {
-    color: '#9CA3AF',
-    marginTop: 8,
-    fontSize: 16,
-  },
-  cameraSubtext: {
-    color: '#6B7280',
-    fontSize: 12,
-    marginTop: 4,
   },
   cameraOverlay: {
     position: 'absolute',
@@ -406,6 +431,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     padding: 8,
     borderRadius: 4,
+    alignSelf: 'flex-start',
   },
   recordingDot: {
     width: 12,
@@ -422,15 +448,6 @@ const styles = StyleSheet.create({
     color: 'white',
     fontFamily: 'monospace',
     fontSize: 14,
-  },
-  cameraControls: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    padding: 10,
-    backgroundColor: 'transparent',
-  },
-  controlButton: {
-    padding: 10,
   },
   speedOverlay: {
     position: 'absolute',
