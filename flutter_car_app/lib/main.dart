@@ -82,50 +82,91 @@ class _AIDashcamAppState extends State<AIDashcamApp> {
       setState(() {
         _cameras = cameras;
       });
-      _initializeCameraController();
+      if (_cameras.isNotEmpty) {
+        await _initializeCameraController();
+      }
     } catch (e) {
       print('Error initializing cameras: $e');
+      addAlert(AlertType.danger, 'Camera initialization failed');
     }
   }
 
-  void _initializeCameraController() async {
+  Future<void> _initializeCameraController() async {
     if (_cameras.isEmpty) return;
-    CameraDescription? selectedCamera;
-    if (activeCamera == 'front') {
-      selectedCamera = _cameras.firstWhere(
-        (c) => c.lensDirection == CameraLensDirection.front,
-        orElse: () => _cameras.first,
-      );
-    } else {
-      selectedCamera = _cameras.firstWhere(
-        (c) => c.lensDirection == CameraLensDirection.back,
-        orElse: () => _cameras.first,
-      );
+    
+    // Dispose old controller properly
+    if (_cameraController != null) {
+      await _cameraController!.dispose();
+      _cameraController = null;
     }
-    _cameraController?.dispose();
+    
+    setState(() {
+      _isCameraInitialized = false;
+    });
+    
+    CameraDescription? selectedCamera;
+    try {
+      if (activeCamera == 'front') {
+        selectedCamera = _cameras.firstWhere(
+          (c) => c.lensDirection == CameraLensDirection.front,
+          orElse: () => _cameras.first,
+        );
+      } else {
+        selectedCamera = _cameras.firstWhere(
+          (c) => c.lensDirection == CameraLensDirection.back,
+          orElse: () => _cameras.first,
+        );
+      }
+    } catch (e) {
+      print('Error selecting camera: $e');
+      selectedCamera = _cameras.first;
+    }
+    
+    if (selectedCamera == null) {
+      addAlert(AlertType.danger, 'No camera available');
+      return;
+    }
+    
     _cameraController = CameraController(
       selectedCamera,
       ResolutionPreset.medium,
       enableAudio: false,
     );
+    
     try {
       await _cameraController!.initialize();
-      setState(() {
-        _isCameraInitialized = true;
-      });
+      if (mounted) {
+        setState(() {
+          _isCameraInitialized = true;
+        });
+      }
     } catch (e) {
       print('Error initializing camera controller: $e');
+      addAlert(AlertType.danger, 'Failed to initialize camera');
+      if (_cameraController != null) {
+        await _cameraController!.dispose();
+        _cameraController = null;
+      }
     }
   }
 
-  void _switchCamera(String mode) {
+  Future<void> _switchCamera(String mode) async {
+    if (activeCamera == mode) return; // Don't switch if already on that camera
+    
     setState(() {
       activeCamera = mode;
       cameraType = mode == 'front' ? 'front' : 'back';
-      _isCameraInitialized = false;
     });
-    _initializeCameraController();
-    addAlert(AlertType.info, 'Switched to $mode camera');
+    
+    addAlert(AlertType.info, 'Switching to $mode camera...');
+    
+    await _initializeCameraController();
+    
+    if (_isCameraInitialized) {
+      addAlert(AlertType.success, 'Switched to $mode camera');
+    } else {
+      addAlert(AlertType.danger, 'Failed to switch to $mode camera');
+    }
   }
 
   void _startTimers() {
@@ -284,17 +325,30 @@ class _AIDashcamAppState extends State<AIDashcamApp> {
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(Icons.camera_alt, size: 64, color: Color(0xFF9CA3AF)),
-                            SizedBox(height: 8),
+                            if (!_isCameraInitialized)
+                              CircularProgressIndicator(
+                                valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF60A5FA)),
+                              )
+                            else
+                              Icon(Icons.camera_alt, size: 64, color: Color(0xFF9CA3AF)),
+                            SizedBox(height: 16),
                             Text(
                               activeCamera == 'front' ? 'Front Camera' : 'Rear Camera',
                               style: TextStyle(color: Color(0xFF9CA3AF), fontSize: 16),
                             ),
                             SizedBox(height: 4),
                             Text(
-                              'Camera Feed Initializing...',
+                              _isCameraInitialized ? 'Camera Ready' : 'Initializing Camera...',
                               style: TextStyle(color: Color(0xFF6B7280), fontSize: 12),
                             ),
+                            if (_cameras.isEmpty)
+                              Padding(
+                                padding: EdgeInsets.only(top: 8),
+                                child: Text(
+                                  'No cameras detected',
+                                  style: TextStyle(color: Color(0xFFEF4444), fontSize: 12),
+                                ),
+                              ),
                           ],
                         ),
                       ),
@@ -455,7 +509,7 @@ class _AIDashcamAppState extends State<AIDashcamApp> {
                                 child: Padding(
                                   padding: EdgeInsets.only(right: mode == 'front' ? 8 : 0),
                                   child: GestureDetector(
-                                    onTap: () {
+                                    onTap: !_isCameraInitialized ? null : () {
                                       _switchCamera(mode);
                                     },
                                     child: Container(
@@ -464,10 +518,31 @@ class _AIDashcamAppState extends State<AIDashcamApp> {
                                         color: activeCamera == mode ? Color(0xFF2563EB) : Color(0xFF374151),
                                         borderRadius: BorderRadius.circular(8),
                                       ),
-                                      child: Text(
-                                        mode[0].toUpperCase() + mode.substring(1),
-                                        textAlign: TextAlign.center,
-                                        style: TextStyle(color: Colors.white, fontSize: 14),
+                                      child: Row(
+                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        children: [
+                                          if (activeCamera == mode && !_isCameraInitialized)
+                                            SizedBox(
+                                              width: 12,
+                                              height: 12,
+                                              child: CircularProgressIndicator(
+                                                strokeWidth: 2,
+                                                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                              ),
+                                            ),
+                                          if (activeCamera == mode && !_isCameraInitialized)
+                                            SizedBox(width: 8),
+                                          Text(
+                                            mode[0].toUpperCase() + mode.substring(1),
+                                            textAlign: TextAlign.center,
+                                            style: TextStyle(
+                                              color: !_isCameraInitialized && activeCamera != mode 
+                                                ? Color(0xFF6B7280) 
+                                                : Colors.white, 
+                                              fontSize: 14
+                                            ),
+                                          ),
+                                        ],
                                       ),
                                     ),
                                   ),
