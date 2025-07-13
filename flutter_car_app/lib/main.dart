@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:camera/camera.dart';
+import 'package:http/http.dart' as http;
 import 'dart:async';
 import 'dart:math';
-import 'package:camera/camera.dart';
+import 'dart:convert';
+import 'dart:typed_data';
 
 // Define types for better type safety
 enum AlertType { danger, warning, info, success }
@@ -69,6 +72,22 @@ class _AIDashcamAppState extends State<AIDashcamApp> {
     super.initState();
     _initializeCameras();
     _startTimers();
+    _checkBackendConnection();
+  }
+
+  // Check backend connection on startup
+  Future<void> _checkBackendConnection() async {
+    final isConnected = await _checkBackendHealth();
+    if (mounted) {
+      setState(() {
+        _backendConnected = isConnected;
+      });
+    }
+    if (isConnected) {
+      addAlert(AlertType.success, 'Backend AI model connected');
+    } else {
+      addAlert(AlertType.danger, 'Backend AI model not available');
+    }
   }
 
   @override
@@ -743,6 +762,10 @@ class _AIDashcamAppState extends State<AIDashcamApp> {
       }
       
       debugPrint('Picture captured: ${image.path} at $timestamp');
+      
+      // Send image to backend for AI analysis
+      await _sendImageToBackend(image, timestamp);
+      
     } catch (e) {
       debugPrint('Error capturing picture: $e');
       if (mounted) {
@@ -750,6 +773,127 @@ class _AIDashcamAppState extends State<AIDashcamApp> {
           _isCapturing = false; // Clear flag on error
         });
       }
+    }
+  }
+
+  // Send image to backend for AI analysis
+  Future<void> _sendImageToBackend(XFile image, DateTime timestamp) async {
+    try {
+      // Convert image to bytes
+      final Uint8List imageBytes = await image.readAsBytes();
+      
+      debugPrint('Image size: ${imageBytes.length} bytes');
+      debugPrint('Sending image to backend: ${image.path}');
+      
+      // Create multipart request
+      final request = http.MultipartRequest(
+        'POST',
+        Uri.parse('$backendUrl$analyzeEndpoint'),
+      );
+      
+      // Add image file
+      request.files.add(
+        http.MultipartFile.fromBytes(
+          'image',
+          imageBytes,
+          filename: 'dashcam_${timestamp.millisecondsSinceEpoch}.jpg',
+        ),
+      );
+      
+      // Add timestamp
+      request.fields['timestamp'] = timestamp.toIso8601String();
+      
+      debugPrint('Request URL: ${request.url}');
+      debugPrint('Request fields: ${request.fields}');
+      debugPrint('Request files: ${request.files.length}');
+      
+      // Send request with timeout
+      final response = await request.send().timeout(
+        Duration(seconds: 30),
+        onTimeout: () {
+          throw TimeoutException('Request timed out after 30 seconds');
+        },
+      );
+      
+      final responseBody = await response.stream.bytesToString();
+      debugPrint('Response status: ${response.statusCode}');
+      debugPrint('Response body: $responseBody');
+      
+      if (response.statusCode == 200) {
+        final result = json.decode(responseBody);
+        debugPrint('AI Analysis Result: $result');
+        
+        if (mounted) {
+          setState(() {
+            _aiResults.add({
+              'timestamp': timestamp,
+              'result': result,
+            });
+          });
+          
+          // Keep only last 50 AI results
+          if (_aiResults.length > 50) {
+            setState(() {
+              _aiResults.removeAt(0);
+            });
+          }
+          
+          // Process AI results and show alerts
+          _processAIResult(result, timestamp);
+        }
+      } else {
+        debugPrint('Backend error: ${response.statusCode} - $responseBody');
+        if (mounted) {
+          addAlert(AlertType.danger, 'Backend error: ${response.statusCode}');
+        }
+      }
+      
+    } catch (e) {
+      debugPrint('Error sending image to backend: $e');
+      if (mounted) {
+        addAlert(AlertType.danger, 'Network error: ${e.toString()}');
+      }
+    }
+  }
+
+  // Process AI analysis results and show alerts
+  void _processAIResult(Map<String, dynamic> result, DateTime timestamp) {
+    try {
+      // Get the raw prediction from your model
+      final String prediction = result['prediction'] ?? 'unknown';
+      final double confidence = result['confidence'] ?? 0.0;
+      final Map<String, dynamic> allProbabilities = result['all_probabilities'] ?? {};
+      
+      // Show the raw result as an alert
+      addAlert(AlertType.info, 'AI: $prediction (${(confidence * 100).toStringAsFixed(1)}%)');
+      
+      // Also show all probabilities as separate alerts
+      allProbabilities.forEach((className, probability) {
+        final probPercent = (probability * 100).toStringAsFixed(1);
+        addAlert(AlertType.info, '$className: $probPercent%');
+      });
+      
+      // Print detailed results to console
+      debugPrint('=== AI MODEL RESULT ===');
+      debugPrint('Prediction: $prediction');
+      debugPrint('Confidence: ${(confidence * 100).toStringAsFixed(1)}%');
+      debugPrint('All probabilities: $allProbabilities');
+      debugPrint('========================');
+      
+    } catch (e) {
+      debugPrint('Error processing AI result: $e');
+      addAlert(AlertType.danger, 'AI processing error: $e');
+    }
+  }
+
+  // Check backend health
+  Future<bool> _checkBackendHealth() async {
+    try {
+      final response = await http.get(Uri.parse('$backendUrl$healthEndpoint'));
+      return response.statusCode == 200;
+    } catch (e) {
+      debugPrint('Backend health check failed: $e');
+      return false;
     }
   }
 }
