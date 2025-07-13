@@ -51,18 +51,20 @@ class _AIDashcamAppState extends State<AIDashcamApp> {
   AIFeatures aiFeatures = AIFeatures();
   String cameraType = 'back';
   bool isRecordingVideo = false;
+  String cameraViewMode = 'single'; // 'single' or 'dual'
 
   Timer? _timer;
   Timer? _speedTimer;
   Timer? _alertTimer;
-  Timer? _captureTimer; // Timer for automatic picture capture
+  Timer? _captureTimer;
   final Random _random = Random();
 
   List<CameraDescription> _cameras = [];
-  CameraController? _cameraController;
-  bool _isCameraInitialized = false;
-  bool _isCapturing = false; // Add flag for capture indicator
-  final List<Map<String, dynamic>> _capturedImages = []; // Store captured images
+  CameraController? _frontCameraController;
+  CameraController? _rearCameraController;
+  bool _isFrontCameraInitialized = false;
+  bool _isRearCameraInitialized = false;
+  final List<Map<String, dynamic>> _capturedImages = [];
 
   @override
   void initState() {
@@ -76,110 +78,113 @@ class _AIDashcamAppState extends State<AIDashcamApp> {
     _timer?.cancel();
     _speedTimer?.cancel();
     _alertTimer?.cancel();
-    _captureTimer?.cancel(); // Cancel capture timer
-    _cameraController?.dispose();
+    _captureTimer?.cancel();
+    _frontCameraController?.dispose();
+    _rearCameraController?.dispose();
     super.dispose();
   }
 
   Future<void> _initializeCameras() async {
     try {
       WidgetsFlutterBinding.ensureInitialized();
+      debugPrint('Requesting camera permissions...');
       final cameras = await availableCameras();
+      debugPrint('Camera permission check completed');
+      
       if (mounted) {
         setState(() {
           _cameras = cameras;
         });
         if (_cameras.isNotEmpty) {
-          await _initializeCameraController();
+          await _initializeCameraControllers();
         } else {
           addAlert(AlertType.warning, 'No cameras found');
+          debugPrint('No cameras available on this device');
         }
       }
     } catch (e) {
       debugPrint('Error initializing cameras: $e');
       if (mounted) {
-        addAlert(AlertType.danger, 'Camera initialization failed');
+        addAlert(AlertType.danger, 'Camera initialization failed: $e');
       }
     }
   }
 
-  Future<void> _initializeCameraController() async {
+  Future<void> _initializeCameraControllers() async {
     if (_cameras.isEmpty) return;
     
-    // Dispose old controller properly
-    if (_cameraController != null) {
-      await _cameraController!.dispose();
-      _cameraController = null;
-    }
-    
     if (mounted) {
       setState(() {
-        _isCameraInitialized = false;
+        _isFrontCameraInitialized = false;
+        _isRearCameraInitialized = false;
       });
     }
     
-    CameraDescription? selectedCamera;
-    try {
-      if (activeCamera == 'front') {
-        selectedCamera = _cameras.firstWhere(
-          (c) => c.lensDirection == CameraLensDirection.front,
-          orElse: () => _cameras.first,
-        );
-      } else {
-        selectedCamera = _cameras.firstWhere(
-          (c) => c.lensDirection == CameraLensDirection.back,
-          orElse: () => _cameras.first,
-        );
-      }
-    } catch (e) {
-      debugPrint('Error selecting camera: $e');
-      selectedCamera = _cameras.first;
+    CameraDescription? frontCamera;
+    CameraDescription? rearCamera;
+    
+    debugPrint('Available cameras: $_cameras');
+    for (var cam in _cameras) {
+      debugPrint('  ${cam.name} (${cam.lensDirection})');
     }
     
-    _cameraController = CameraController(
-      selectedCamera,
-      ResolutionPreset.medium,
-      enableAudio: false,
-    );
-    
-    try {
-      await _cameraController!.initialize();
-      if (mounted) {
-        setState(() {
-          _isCameraInitialized = true;
-        });
-      }
-    } catch (e) {
-      debugPrint('Error initializing camera controller: $e');
-      if (mounted) {
-        addAlert(AlertType.danger, 'Failed to initialize camera');
-      }
-      if (_cameraController != null) {
-        await _cameraController!.dispose();
-        _cameraController = null;
+    for (var camera in _cameras) {
+      if (camera.lensDirection == CameraLensDirection.front) {
+        frontCamera = camera;
+      } else if (camera.lensDirection == CameraLensDirection.back) {
+        rearCamera = camera;
       }
     }
-  }
+    debugPrint('Selected front camera: $frontCamera');
+    debugPrint('Selected rear camera: $rearCamera');
 
-  Future<void> _switchCamera(String mode) async {
-    if (activeCamera == mode) return; // Don't switch if already on that camera
-    
-    if (mounted) {
-      setState(() {
-        activeCamera = mode;
-        cameraType = mode == 'front' ? 'front' : 'back';
-      });
+    if (frontCamera != null) {
+      _frontCameraController?.dispose();
+      _frontCameraController = CameraController(
+        frontCamera,
+        ResolutionPreset.medium,
+        enableAudio: false,
+      );
+      try {
+        await _frontCameraController!.initialize();
+        if (mounted) {
+          setState(() {
+            _isFrontCameraInitialized = true;
+          });
+        }
+        debugPrint('Front camera initialized successfully');
+      } catch (e) {
+        debugPrint('Error initializing front camera: $e');
+        if (mounted) {
+          setState(() {
+            _isFrontCameraInitialized = false;
+          });
+        }
+      }
     }
-    
-    addAlert(AlertType.info, 'Switching to $mode camera...');
-    
-    await _initializeCameraController();
-    
-    if (mounted) {
-      if (_isCameraInitialized) {
-        addAlert(AlertType.success, 'Switched to $mode camera');
-      } else {
-        addAlert(AlertType.danger, 'Failed to switch to $mode camera');
+
+    if (rearCamera != null) {
+      _rearCameraController?.dispose();
+      _rearCameraController = CameraController(
+        rearCamera,
+        ResolutionPreset.medium,
+        enableAudio: false,
+      );
+      try {
+        await _rearCameraController!.initialize();
+        if (mounted) {
+          setState(() {
+            _isRearCameraInitialized = true;
+          });
+        }
+        debugPrint('Rear camera initialized successfully');
+      } catch (e) {
+        debugPrint('Error initializing rear camera: $e');
+        if (mounted) {
+          setState(() {
+            _isRearCameraInitialized = false;
+          });
+        }
       }
     }
   }
@@ -295,6 +300,64 @@ class _AIDashcamAppState extends State<AIDashcamApp> {
       body: SafeArea(
         child: Column(
           children: [
+            // Camera View Mode Selection
+            Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () {
+                        setState(() {
+                          cameraViewMode = 'single';
+                          activeCamera = 'front';
+                        });
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: cameraViewMode == 'single' && activeCamera == 'front'
+                            ? Colors.blue
+                            : Colors.grey[800],
+                      ),
+                      child: Text('Front'),
+                    ),
+                  ),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () {
+                        setState(() {
+                          cameraViewMode = 'single';
+                          activeCamera = 'rear';
+                        });
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: cameraViewMode == 'single' && activeCamera == 'rear'
+                            ? Colors.blue
+                            : Colors.grey[800],
+                      ),
+                      child: Text('Rear'),
+                    ),
+                  ),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () {
+                        setState(() {
+                          cameraViewMode = 'dual';
+                        });
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: cameraViewMode == 'dual'
+                            ? Colors.blue
+                            : Colors.grey[800],
+                      ),
+                      child: Text('Dual'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            
             // Main Camera Display
             Expanded(
               flex: 2,
@@ -303,125 +366,142 @@ class _AIDashcamAppState extends State<AIDashcamApp> {
                   color: Color(0xFF374151),
                   border: Border.all(color: Color(0xFF4B5563), width: 2),
                 ),
-                child: Stack(
-                  children: [
-                    // Camera Feed
-                    if (_isCameraInitialized && _cameraController != null)
-                      CameraPreview(_cameraController!)
-                    else
-                      Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            if (!_isCameraInitialized)
-                              CircularProgressIndicator(
-                                valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF60A5FA)),
-                              )
-                            else
-                              Icon(Icons.camera_alt, size: 64, color: Color(0xFF9CA3AF)),
-                            SizedBox(height: 16),
-                            Text(
-                              activeCamera == 'front' ? 'Front Camera' : 'Rear Camera',
-                              style: TextStyle(color: Color(0xFF9CA3AF), fontSize: 16),
-                            ),
-                            SizedBox(height: 4),
-                            Text(
-                              _isCameraInitialized ? 'Camera Ready' : 'Initializing Camera...',
-                              style: TextStyle(color: Color(0xFF6B7280), fontSize: 12),
-                            ),
-                            if (_cameras.isEmpty)
-                              Padding(
-                                padding: EdgeInsets.only(top: 8),
-                                child: Text(
-                                  'No cameras detected',
-                                  style: TextStyle(color: Color(0xFFEF4444), fontSize: 12),
-                                ),
-                              ),
-                          ],
-                        ),
-                      ),
-
-                    // Camera Overlays
-                    Positioned(
-                      top: 16,
-                      left: 16,
-                      child: isRecording ? Container(
-                        padding: EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: Colors.black.withValues(alpha: 0.5),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Container(
-                              width: 12,
-                              height: 12,
-                              decoration: BoxDecoration(
-                                color: Color(0xFFEF4444),
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                            ),
-                            SizedBox(width: 8),
-                            Text('REC', style: TextStyle(color: Color(0xFFEF4444), fontSize: 14, fontFamily: 'monospace')),
-                            SizedBox(width: 8),
-                            Text(formatTime(recordingTime), style: TextStyle(color: Colors.white, fontSize: 14, fontFamily: 'monospace')),
-                          ],
-                        ),
-                      ) : SizedBox.shrink(),
-                    ),
-
-                    // Speed and Location Overlay
-                    Positioned(
-                      bottom: 16,
-                      left: 16,
-                      child: Container(
-                        padding: EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: Colors.black.withValues(alpha: 0.5),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.location_on, size: 16, color: Colors.white),
-                            SizedBox(width: 8),
-                            Text('${speed.round()} mph', style: TextStyle(color: Colors.white, fontSize: 14)),
-                          ],
-                        ),
-                      ),
-                    ),
-
-                    // Capture Indicator
-                    if (_isCapturing)
-                      Positioned(
-                        top: 16,
-                        right: 16,
-                        child: Container(
-                          padding: EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: Colors.red.withValues(alpha: 0.8),
-                            borderRadius: BorderRadius.circular(4),
+                child: cameraViewMode == 'dual'
+                    ? Column(
+                        children: [
+                          Expanded(
+                            child: _isFrontCameraInitialized && _frontCameraController != null
+                                ? Stack(
+                                    children: [
+                                      CameraPreview(_frontCameraController!),
+                                      Positioned(
+                                        top: 8,
+                                        left: 8,
+                                        child: Container(
+                                          padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                          decoration: BoxDecoration(
+                                            color: Colors.black.withAlpha((0.7 * 255).toInt()),
+                                            borderRadius: BorderRadius.circular(4),
+                                          ),
+                                          child: Text('FRONT', style: TextStyle(color: Colors.white)),
+                                        ),
+                                      ),
+                                    ],
+                                  )
+                                : Center(
+                                    child: Column(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        CircularProgressIndicator(),
+                                        SizedBox(height: 8),
+                                        Text(
+                                          'Front Camera',
+                                          style: TextStyle(color: Colors.white, fontSize: 12),
+                                        ),
+                                        Text(
+                                          'Status: $_isFrontCameraInitialized',
+                                          style: TextStyle(color: Colors.white, fontSize: 10),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
                           ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Container(
-                                width: 8,
-                                height: 8,
+                          Expanded(
+                            child: _isRearCameraInitialized && _rearCameraController != null
+                                ? Stack(
+                                    children: [
+                                      CameraPreview(_rearCameraController!),
+                                      Positioned(
+                                        top: 8,
+                                        left: 8,
+                                        child: Container(
+                                          padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                          decoration: BoxDecoration(
+                                            color: Colors.black.withAlpha((0.7 * 255).toInt()),
+                                            borderRadius: BorderRadius.circular(4),
+                                          ),
+                                          child: Text('REAR', style: TextStyle(color: Colors.white)),
+                                        ),
+                                      ),
+                                      // Speed overlay for rear camera
+                                      Positioned(
+                                        bottom: 16,
+                                        left: 16,
+                                        child: Container(
+                                          padding: EdgeInsets.all(8),
+                                          decoration: BoxDecoration(
+                                            color: Colors.black.withAlpha((0.5 * 255).toInt()),
+                                            borderRadius: BorderRadius.circular(4),
+                                          ),
+                                          child: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Icon(Icons.location_on, size: 16, color: Colors.white),
+                                              SizedBox(width: 8),
+                                              Text('${speed.round()} mph', style: TextStyle(color: Colors.white, fontSize: 14)),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  )
+                                : Center(child: CircularProgressIndicator()),
+                          ),
+                        ],
+                      )
+                    : Stack(
+                        children: [
+                          _buildSingleCameraView(),
+                          if (isRecording)
+                            Positioned(
+                              top: 16,
+                              right: 16,
+                              child: Container(
+                                padding: EdgeInsets.all(8),
                                 decoration: BoxDecoration(
-                                  color: Colors.white,
+                                  color: Colors.black.withAlpha((0.5 * 255).toInt()),
                                   borderRadius: BorderRadius.circular(4),
                                 ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Container(
+                                      width: 12,
+                                      height: 12,
+                                      decoration: BoxDecoration(
+                                        color: Color(0xFFEF4444),
+                                        borderRadius: BorderRadius.circular(6),
+                                      ),
+                                    ),
+                                    SizedBox(width: 8),
+                                    Text('REC', style: TextStyle(color: Color(0xFFEF4444), fontSize: 14, fontFamily: 'monospace')),
+                                    SizedBox(width: 8),
+                                    Text(formatTime(recordingTime), style: TextStyle(color: Colors.white, fontSize: 14, fontFamily: 'monospace')),
+                                  ],
+                                ),
                               ),
-                              SizedBox(width: 6),
-                              Text('CAPTURING', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
-                            ],
+                            ),
+                          Positioned(
+                            bottom: 16,
+                            left: 16,
+                            child: Container(
+                              padding: EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: Colors.black.withAlpha((0.5 * 255).toInt()),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.location_on, size: 16, color: Colors.white),
+                                  SizedBox(width: 8),
+                                  Text('${speed.round()} mph', style: TextStyle(color: Colors.white, fontSize: 14)),
+                                ],
+                              ),
+                            ),
                           ),
-                        ),
+                        ],
                       ),
-                  ],
-                ),
               ),
             ),
 
@@ -513,66 +593,6 @@ class _AIDashcamAppState extends State<AIDashcamApp> {
                         ),
                       ),
 
-                      // Camera Selection
-                      Container(
-                        margin: EdgeInsets.only(bottom: 24),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text('Camera Mode', style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600)),
-                            SizedBox(height: 8),
-                            Row(
-                              children: ['front', 'rear'].map((mode) => Expanded(
-                                child: Padding(
-                                  padding: EdgeInsets.only(right: mode == 'front' ? 8 : 0),
-                                  child: GestureDetector(
-                                    onTap: !_isCameraInitialized ? null : () {
-                                      _switchCamera(mode);
-                                    },
-                                    child: Container(
-                                      padding: EdgeInsets.symmetric(vertical: 8, horizontal: 16),
-                                      decoration: BoxDecoration(
-                                        color: activeCamera == mode ? Color(0xFF2563EB) : Color(0xFF374151),
-                                        borderRadius: BorderRadius.circular(8),
-                                      ),
-                                      child: Row(
-                                        mainAxisAlignment: MainAxisAlignment.center,
-                                        children: [
-                                          if (activeCamera == mode && !_isCameraInitialized)
-                                            SizedBox(
-                                              width: 12,
-                                              height: 12,
-                                              child: CircularProgressIndicator(
-                                                strokeWidth: 2,
-                                                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                                              ),
-                                            ),
-                                                                                     if (activeCamera == mode && !_isCameraInitialized)
-                                             Padding(
-                                               padding: EdgeInsets.only(left: 8),
-                                               child: SizedBox(),
-                                             ),
-                                          Text(
-                                            mode[0].toUpperCase() + mode.substring(1),
-                                            textAlign: TextAlign.center,
-                                            style: TextStyle(
-                                              color: !_isCameraInitialized && activeCamera != mode 
-                                                ? Color(0xFF6B7280) 
-                                                : Colors.white, 
-                                              fontSize: 14
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              )).toList(),
-                            ),
-                          ],
-                        ),
-                      ),
-
                       // AI Features
                       Container(
                         margin: EdgeInsets.only(bottom: 24),
@@ -615,26 +635,30 @@ class _AIDashcamAppState extends State<AIDashcamApp> {
                       Row(
                         children: [
                           Expanded(
-                            child: Container(
-                              margin: EdgeInsets.only(right: 12),
-                              child: GestureDetector(
-                                onTap: () {},
-                                child: Container(
-                                  padding: EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-                                  decoration: BoxDecoration(
-                                    color: Color(0xFF374151),
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Icon(Icons.settings, size: 20, color: Colors.white),
-                                      SizedBox(width: 8),
-                                      Text('Settings', style: TextStyle(color: Colors.white, fontSize: 14)),
-                                    ],
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: GestureDetector(
+                                    onTap: () {},
+                                    child: Container(
+                                      padding: EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                                      decoration: BoxDecoration(
+                                        color: Color(0xFF374151),
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: Row(
+                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        children: [
+                                          Icon(Icons.settings, size: 20, color: Colors.white),
+                                          SizedBox(width: 8),
+                                          Text('Settings', style: TextStyle(color: Colors.white, fontSize: 14)),
+                                        ],
+                                      ),
+                                    ),
                                   ),
                                 ),
-                              ),
+                                SizedBox(width: 12),
+                              ],
                             ),
                           ),
                           Expanded(
@@ -682,6 +706,62 @@ class _AIDashcamAppState extends State<AIDashcamApp> {
     );
   }
 
+  Widget _buildSingleCameraView() {
+    CameraController? controller = activeCamera == 'front'
+        ? _frontCameraController
+        : _rearCameraController;
+    bool isInitialized = activeCamera == 'front'
+        ? _isFrontCameraInitialized
+        : _isRearCameraInitialized;
+    
+    if (isInitialized && controller != null) {
+      return Stack(
+        children: [
+          CameraPreview(controller),
+          Positioned(
+            top: 8,
+            left: 8,
+            child: Container(
+              padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.black.withAlpha((0.7 * 255).toInt()),
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: Text(
+                activeCamera.toUpperCase(),
+                style: TextStyle(color: Colors.white),
+              ),
+            ),
+          ),
+        ],
+      );
+    } else {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            CircularProgressIndicator(),
+            SizedBox(height: 16),
+            Text(
+              'Initializing $activeCamera camera...',
+              style: TextStyle(color: Colors.white),
+            ),
+            SizedBox(height: 8),
+            Text(
+              'Front: $_isFrontCameraInitialized, Rear: $_isRearCameraInitialized',
+              style: TextStyle(color: Colors.white, fontSize: 12),
+            ),
+            SizedBox(height: 4),
+            Text(
+              'Available cameras: ${_cameras.length}',
+              style: TextStyle(color: Colors.white, fontSize: 12),
+            ),
+          ],
+        ),
+      );
+    }
+  }
+
   Widget _buildFeatureItem(String title, bool isChecked, VoidCallback onTap) {
     return GestureDetector(
       onTap: onTap,
@@ -714,27 +794,25 @@ class _AIDashcamAppState extends State<AIDashcamApp> {
   }
 
   void _capturePicture() async {
-    if (_cameraController == null || !_cameraController!.value.isInitialized) {
+    CameraController? controllerToUse = _rearCameraController?.value.isInitialized == true 
+        ? _rearCameraController 
+        : _frontCameraController?.value.isInitialized == true 
+            ? _frontCameraController 
+            : null;
+            
+    if (controllerToUse == null) {
       return;
     }
 
     try {
-      if (mounted) {
-        setState(() {
-          _isCapturing = true; // Set flag to show capturing indicator
-        });
-      }
-      
-      final XFile image = await _cameraController!.takePicture();
+      final XFile image = await controllerToUse.takePicture();
       final timestamp = DateTime.now();
       
       if (mounted) {
         setState(() {
           _capturedImages.add({'file': image, 'timestamp': timestamp});
-          _isCapturing = false; // Clear flag after capture
         });
         
-        // Keep only the last 100 images to prevent memory issues
         if (_capturedImages.length > 100) {
           setState(() {
             _capturedImages.removeAt(0);
@@ -745,11 +823,6 @@ class _AIDashcamAppState extends State<AIDashcamApp> {
       debugPrint('Picture captured: ${image.path} at $timestamp');
     } catch (e) {
       debugPrint('Error capturing picture: $e');
-      if (mounted) {
-        setState(() {
-          _isCapturing = false; // Clear flag on error
-        });
-      }
     }
   }
 }
