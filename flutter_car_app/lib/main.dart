@@ -205,8 +205,8 @@ class _AIDashcamAppState extends State<AIDashcamApp> {
       });
     });
 
-    _captureTimer = Timer.periodic(Duration(seconds: 5), (timer) {
-      if (mounted && isRecording) {
+    _captureTimer = Timer.periodic(Duration(seconds: 1), (timer) {
+      if (mounted) {
         _capturePicture();
       }
     });
